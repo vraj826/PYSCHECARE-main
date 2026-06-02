@@ -4,6 +4,7 @@ import os
 import pickle
 import random
 import sys
+from pathlib import Path
 from typing import Dict
 
 import nltk
@@ -14,9 +15,16 @@ from nltk.stem import WordNetLemmatizer
 
 logging.basicConfig(level=logging.ERROR)
 
-# Add the Python-Mental-Health-Chatbot-main directory to sys.path
-python_chatbot_path = os.path.join(os.path.dirname(__file__), "Python-Mental-Health-Chatbot-main", "Python-Mental-Health-Chatbot-main")
-sys.path.append(python_chatbot_path)
+# Resolve the absolute path dynamically
+base_dir = Path(__file__).resolve().parent
+python_chatbot_path = base_dir / "Python-Mental-Health-Chatbot-main" / "Python-Mental-Health-Chatbot-main"
+
+# Check if it actually exists before altering the environment
+if python_chatbot_path.exists() and python_chatbot_path.is_dir():
+    sys.path.insert(0, str(python_chatbot_path))  # Using insert(0) is often safer to prioritize local modules
+else:
+    print(f"Warning: Chatbot dependencies directory not found at {python_chatbot_path}")
+    print("Ensure the chatbot submodule is cloned correctly.")
 
 # Make sure required NLTK packages are downloaded
 try:
