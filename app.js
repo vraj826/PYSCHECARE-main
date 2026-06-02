@@ -102,27 +102,28 @@ let smallCradOptions={
 }
 
 
-let smallCardobserver= new IntersectionObserver((entries,observe)=>{
+let smallCardobserver = new IntersectionObserver((entries, observe) => {
 
+    entries.forEach((entry) => {
 
-    let speed=300;
-
-    entries.forEach((entry)=>{
-
-        if(entry.isIntersecting){
-            entry.target.style.transitionDuration=`${speed}ms`;
+        if (entry.isIntersecting) {
             entry.target.classList.add('appear');
         }
 
-        speed+=200;
-    })
+    });
 
-},smallCradOptions)
+}, smallCradOptions);
 
 
-smallCrads.forEach((card)=>{
+smallCrads.forEach((card, index) => {
+
+    const delay = 300 + (index * 200);
+
+    card.style.transitionDelay = `${delay}ms`;
+
     smallCardobserver.observe(card);
-})
+
+});
 
 
 
