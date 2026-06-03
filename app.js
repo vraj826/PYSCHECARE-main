@@ -76,7 +76,7 @@ const cards=document.querySelectorAll('.card');
 let options ={
     root: null,
     rootMargin:'200px',
-    threshold:1.0
+    threshold:0.15
 }
 
 let observer= new IntersectionObserver((entries,observe)=>{
