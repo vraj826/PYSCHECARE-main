@@ -35,12 +35,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             header("Location: welcome.php"); // Redirect to a welcome page
             exit();
         } else {
-            // Invalid credentials - redirect back to login with error parameter
-            header("Location: login.html?error=1");
-            exit();
+            recordFailure($db, $username, $ip);
+            // Generic message — don't reveal whether username exists
+            $error = 'Invalid username or password.';
         }
-    } catch (PDOException $e) {
-        die("Database error: " . $e->getMessage());
     }
 }
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+</head>
+<body>
+    <?php if ($error): ?>
+        <p style="color:red;"><?= htmlspecialchars($error) ?></p>
+    <?php endif; ?>
+
+    <form method="POST" action="">
+        <label>Username <input type="text"     name="username" required autocomplete="username"></label><br>
+        <label>Password <input type="password" name="password" required autocomplete="current-password"></label><br>
+        <button type="submit">Log in</button>
+    </form>
+</body>
+</html>
