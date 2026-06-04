@@ -17,7 +17,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Connect to local SQLite database (secure DB lookup instead of hardcoded plaintext)
     try {
-        $db = new PDO('sqlite:database.sqlite');
+        $db = new PDO('sqlite:' . __DIR__ . '/database.sqlite');
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         
         // Ensure table exists
