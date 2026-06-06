@@ -371,14 +371,10 @@ p::selection{
     margin-bottom: 0;
     transition: all 100ms ease-in;
     white-space: nowrap;
-    /*==================================
-    add border radius under issue #120 */
-
-    border-radius: 50em;
+    border-radius: 50px;
     height: 50px;
-    width: 10em;
+    min-width: 11em;
 
-    /*================================== */
 }
 
 
@@ -402,14 +398,9 @@ p::selection{
     margin-bottom: 0;
     transition: all 100ms ease-in;
     white-space: nowrap;
-    /*==================================
-    add border radius under issue #120 */
-
-    border-radius: 50em;
+    border-radius: 50px;
     height: 50px;
-    width: 10em;
-
-    /*================================== */
+    width: 11em;
 }
 
 
@@ -1067,13 +1058,11 @@ p::selection{
 
 
 .take-me-there-btn{
-    /*==================================
-    add border radius under issue #120 */
 
     border: 2px solid var(--primary-color);
-    border-radius: 50em;
+    border-radius: 50px;
     height: 50px;
-    padding: 0 1.5rem;
+    padding: 0.7em 1.3em;
     background-color: var(--primary-color);
     color: #ffffff;
     font-size: 1.5em;
@@ -1092,7 +1081,7 @@ p::selection{
     color: var(--primary-color);
     background-color: transparent;
 }
-/*================================== */
+
 
 .take-there-arrow{
     margin:.3em 0 0 .5em;
