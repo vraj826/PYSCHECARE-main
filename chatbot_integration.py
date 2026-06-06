@@ -46,11 +46,18 @@ context: dict = {}
 CONTEXT_TTL = 1800  # 30 minutes
 
 def _clean_context():
-    """Remove context entries older than TTL."""
+    """Remove context entries older than TTL and enforce a hard size cap."""
     now = time.time()
     expired = [uid for uid, val in context.items() if now - val.get("timestamp", 0) > CONTEXT_TTL]
     for uid in expired:
         del context[uid]
+
+    # Hard cap: if context exceeds 1000 entries after TTL sweep, evict the oldest
+    MAX_CONTEXT_SIZE = 1000
+    if len(context) > MAX_CONTEXT_SIZE:
+        oldest = sorted(context.items(), key=lambda x: x[1].get("timestamp", 0))
+        for uid, _ in oldest[:len(context) - MAX_CONTEXT_SIZE]:
+            del context[uid]
 
 def load_chatbot_model():
     """
@@ -150,7 +157,10 @@ def get_chatbot_response(message, user_id="000"):
         str: The chatbot's response
     """
     global words, classes, model, intents, context
-    
+
+    # Prune stale context entries on every request to prevent unbounded memory growth
+    _clean_context()
+
     # Make sure model is loaded
     if model is None:
         success = load_chatbot_model()
