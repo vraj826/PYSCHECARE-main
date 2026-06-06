@@ -659,7 +659,11 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ message: userText })
+                    // Send stored session_id so bot remembers conversation context
+                    body: JSON.stringify({
+                        message: userText,
+                        session_id: sessionStorage.getItem('psyche_session_id') || undefined
+                    })
                 });
                 
                 if (!response.ok) {
@@ -667,6 +671,11 @@
                 }
                 
                 const data = await response.json();
+
+                // Persist the session_id for the lifetime of the browser tab
+                if (data.session_id) {
+                    sessionStorage.setItem('psyche_session_id', data.session_id);
+                }
                 
                 // Remove typing indicator
                 removeTypingIndicator();
