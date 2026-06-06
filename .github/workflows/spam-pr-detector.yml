@@ -1,0 +1,214 @@
+name: 🛡️ Spam / Low-Effort PR Detector
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  detect-spam:
+    name: Detect Spam or Low-Effort PRs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Analyse PR for spam / low-effort signals
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // ================================================================
+            //  PSYCHECARE — SPAM / LOW-EFFORT PR DETECTOR
+            //
+            //  Flags or closes PRs that match ANY of these conditions:
+            //
+            //  CONDITION A — Tiny diff + advanced claim
+            //    • Changes fewer than 3 lines of code AND
+            //      the PR carries (or claims) the "level:advanced" label.
+            //
+            //  CONDITION B — README-only with no docs tag
+            //    • ONLY modifies README.md (and nothing else) AND
+            //      the PR does NOT carry the "type:docs" label.
+            //
+            //  ACTION:
+            //    • First offence        → add "spam" label + warning comment
+            //    • Spam label present   → close PR + comment
+            //    • Conditions now clean → auto-remove "spam" label + notify
+            // ================================================================
+
+            const owner  = context.repo.owner;
+            const repo   = context.repo.repo;
+            const prNum  = context.payload.pull_request.number;
+            const author = context.payload.pull_request.user.login;
+
+            // ── 1. Ensure required labels exist ──────────────────────────
+            const requiredLabels = [
+              { name: 'spam',           color: 'e11d48', description: '🚫 Spam or low-effort PR' },
+              { name: 'type:docs',      color: '0075ca', description: '📚 Documentation'         },
+              { name: 'level:advanced', color: 'd93f0b', description: '🟠 Advanced — 75 pts'     },
+            ];
+
+            for (const label of requiredLabels) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: label.name });
+              } catch (e) {
+                if (e.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner, repo,
+                    name: label.name, color: label.color, description: label.description
+                  });
+                  console.log(`Created label: ${label.name}`);
+                }
+              }
+            }
+
+            // ── 2. Fetch PR files ─────────────────────────────────────────
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner, repo, pull_number: prNum, per_page: 100
+            });
+
+            const filenames    = files.map(f => f.filename.toLowerCase());
+            const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
+
+            console.log(`Files changed : ${filenames.join(', ')}`);
+            console.log(`Total changes : ${totalChanges} lines`);
+
+            // ── 3. Fetch current labels on PR ─────────────────────────────
+            const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo, issue_number: prNum
+            });
+            const labelNames = new Set(existingLabels.map(l => l.name.toLowerCase()));
+
+            const hasSpam     = labelNames.has('spam');
+            const hasAdvanced = labelNames.has('level:advanced');
+            const hasDocs     = labelNames.has('type:docs');
+
+            // Also check if the PR title / body claims level:advanced
+            const title = (context.payload.pull_request.title || '').toLowerCase();
+            const body  = (context.payload.pull_request.body  || '').toLowerCase();
+            const claimsAdvanced = /level[:\s-]*advanced|advanced[\s-]*level/.test(title + ' ' + body);
+
+            // ── 4. Evaluate conditions ────────────────────────────────────
+
+            // CONDITION A: fewer than 3 lines changed AND labelled/claiming level:advanced
+            const condA = totalChanges < 3 && (hasAdvanced || claimsAdvanced);
+
+            // CONDITION B: ONLY README.md modified AND no type:docs label
+            const onlyReadme = filenames.length > 0 &&
+                               filenames.every(f => f === 'readme.md');
+            const condB = onlyReadme && !hasDocs;
+
+            console.log(`Condition A (tiny+advanced): ${condA}`);
+            console.log(`Condition B (readme-only, no docs tag): ${condB}`);
+
+            // ── 5. PR passes all checks ───────────────────────────────────
+            if (!condA && !condB) {
+              // If PR was previously flagged but contributor has now fixed it,
+              // auto-remove the spam label and post a clearance message
+              if (hasSpam) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo, issue_number: prNum, name: 'spam'
+                  });
+                  console.log(`Removed spam label from PR #${prNum} — conditions now clean.`);
+                } catch (e) {
+                  // Label may have already been removed manually — safe to ignore
+                  console.log(`Could not remove spam label (may already be gone): ${e.message}`);
+                }
+
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: prNum,
+                  body: [
+                    `## ✅ Spam Flag Cleared — @${author}`,
+                    ``,
+                    `Great news! This PR has been re-evaluated and now passes all of our quality checks.`,
+                    `The \`spam\` label has been automatically removed.`,
+                    ``,
+                    `A maintainer will review your PR shortly. Thanks for taking the time to improve it! 🙌`,
+                    ``,
+                    `_Automated check by PsycheCare Spam Detector 🤖_`
+                  ].join('\n')
+                });
+              } else {
+                console.log('PR passed spam checks ✅');
+              }
+              return;
+            }
+
+            // ── 6. Build a human-readable reason string ───────────────────
+            const reasons = [];
+            if (condA)
+              reasons.push(
+                `- **Tiny diff + advanced claim**: This PR changes only **${totalChanges} line(s)** ` +
+                `but is tagged/claimed as \`level:advanced\`. A minimum of 3 lines of substantive ` +
+                `code change is required to qualify for that label.`
+              );
+            if (condB)
+              reasons.push(
+                `- **README-only change without \`type:docs\` label**: PRs that only modify \`README.md\` ` +
+                `must carry the \`type:docs\` label so maintainers can triage them correctly.`
+              );
+
+            const reasonBlock = reasons.join('\n');
+
+            // ── 7. First offence → warn; repeat offence → close ──────────
+            if (!hasSpam) {
+              // Add spam label
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: prNum, labels: ['spam']
+              });
+
+              // Leave a warning comment
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: prNum,
+                body: [
+                  `## 🚨 Low-Effort / Spam PR Detected — @${author}`,
+                  ``,
+                  `Our automated guard flagged this PR for the following reason(s):`,
+                  ``,
+                  reasonBlock,
+                  ``,
+                  `### What to do next`,
+                  `1. **Read** our [Contributing Guidelines](https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md) carefully.`,
+                  `2. **Fix** the issue(s) above and push a new commit to this PR.`,
+                  `3. The \`spam\` label will be **automatically removed** once your PR passes all checks.`,
+                  ``,
+                  `> ⚠️ If this PR is not updated and the \`spam\` label remains, it will be **automatically closed** on the next review cycle.`,
+                  ``,
+                  `_Automated check by PsycheCare Spam Detector 🤖_`
+                ].join('\n')
+              });
+
+              console.log(`Flagged PR #${prNum} with spam label and posted warning.`);
+
+            } else {
+              // Already warned — close the PR
+              await github.rest.pulls.update({
+                owner, repo, pull_number: prNum, state: 'closed'
+              });
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: prNum,
+                body: [
+                  `## 🔒 PR Closed — Spam / Low-Effort`,
+                  ``,
+                  `Hi @${author}, this PR was previously flagged with the \`spam\` label and was not updated to address the concerns raised.`,
+                  ``,
+                  reasonBlock,
+                  ``,
+                  `As a result, it has been **automatically closed**.`,
+                  ``,
+                  `If you believe this was a mistake, please open a new PR that:`,
+                  `- Contains **meaningful changes** (3+ lines of substantive code), OR`,
+                  `- Correctly uses the \`type:docs\` label for documentation-only changes.`,
+                  ``,
+                  `Please also review our [Contributing Guidelines](https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md) before resubmitting.`,
+                  ``,
+                  `_Automated action by PsycheCare Spam Detector 🤖_`
+                ].join('\n')
+              });
+
+              console.log(`Closed PR #${prNum} due to repeated spam/low-effort flag.`);
+            }
