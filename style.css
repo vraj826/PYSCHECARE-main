@@ -376,6 +376,10 @@ p::selection{
     margin-bottom: 0;
     transition: all 100ms ease-in;
     white-space: nowrap;
+    border-radius: 50px;
+    height: 50px;
+    min-width: 11em;
+
 }
 
 
@@ -399,6 +403,9 @@ p::selection{
     margin-bottom: 0;
     transition: all 100ms ease-in;
     white-space: nowrap;
+    border-radius: 50px;
+    height: 50px;
+    width: 11em;
 }
 
 
@@ -1056,10 +1063,13 @@ p::selection{
 
 
 .take-me-there-btn{
-    outline:none;
-    border:none;
-    background-color: transparent;
-    color:var(--primary-color);
+
+    border: 2px solid var(--primary-color);
+    border-radius: 50px;
+    height: 50px;
+    padding: 0.7em 1.3em;
+    background-color: var(--primary-color);
+    color: #ffffff;
     font-size: 1.5em;
     font-weight: 400;
     display: flex;
@@ -1073,7 +1083,8 @@ p::selection{
 
 .take-me-there-btn:hover,
 .take-me-there-btn:focus{
-    color: var(--dark-color);
+    color: var(--primary-color);
+    background-color: transparent;
 }
 
 
