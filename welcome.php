@@ -109,10 +109,10 @@ if (!isset($_SESSION["username"])) {
             <div class="nav-list-cont">
                 <ul class="nav-ul">
                     <li><a href="index.html">HOME</a></li>
-                    <li><a href="otherHTML/chatBot.html">CHAT BOT</a></li>
+                    <li><a href="otherHTML/chatBot.php">CHAT BOT</a></li>
                     <li><a href="otherHTML/statistics.html">STATISTICS</a></li>
                     <li><a href="contact.html">CONTACT</a></li>
-                    <li><a href="login.html">LOGIN</a></li>
+                    <li><a href="logout.php">LOGOUT</a></li>
                 </ul>
             </div>
         </div>
@@ -128,7 +128,7 @@ if (!isset($_SESSION["username"])) {
             </p>
             <div class="welcome-actions">
                 <a href="index.html"><button class="explore-btn">Go to Home</button></a>
-                <a href="otherHTML/chatBot.html"><button class="blog-btn">Open Chat Bot</button></a>
+                <a href="otherHTML/chatBot.php"><button class="blog-btn">Open Chat Bot</button></a>
             </div>
             <p class="welcome-note">If you were not expecting this page, simply return to the home screen.</p>
         </div>

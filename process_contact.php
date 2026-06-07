@@ -25,7 +25,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Invalid email address.");
     }
 
-    // TODO: save to DB or send email
-    echo "Message received. Thank you, $name!";
+    try {
+        require_once __DIR__ . '/database.php';
+        $db = getAuthDatabase();
+
+        $stmt = $db->prepare("INSERT INTO contact_messages (name, email, message) VALUES (:name, :email, :message)");
+        $stmt->execute([
+            ':name' => $name,
+            ':email' => $email,
+            ':message' => $message
+        ]);
+
+        echo "Message received. Thank you, $name!";
+    } catch (PDOException $e) {
+        http_response_code(500);
+        die("Database error. Please try again later.");
+    }
 }
 ?>

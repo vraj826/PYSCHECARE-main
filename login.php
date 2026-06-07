@@ -1,62 +1,79 @@
 <?php
 session_start();
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+
+require_once __DIR__ . '/database.php';
+
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    header("Location: login.html");
+    exit();
 }
 
-// Check if the form is submitted
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Validate CSRF token
-    if (empty($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-        http_response_code(403);
-        die("Invalid CSRF token.");
-    }
-    // Get user input
-    $username = $_POST["username"];
-    $password = $_POST["password"];
-
-    // Connect to local SQLite database (secure DB lookup instead of hardcoded plaintext)
-    try {
-        $db = new PDO('sqlite:database.sqlite');
-        $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        
-        // Ensure table exists
-        $db->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT)");
-        
-        // Retrieve the user from the database securely
-        $stmt = $db->prepare("SELECT password_hash FROM users WHERE username = :username");
-        $stmt->execute([':username' => $username]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        // Verify password hash securely
-        if ($user && password_verify($password, $user['password_hash'])) {
-            // Successful login
-            $_SESSION["username"] = $username;
-            header("Location: welcome.php"); // Redirect to a welcome page
-            exit();
-        } else {
-            recordFailure($db, $username, $ip);
-            // Generic message — don't reveal whether username exists
-            $error = 'Invalid username or password.';
-        }
-    }
+if (
+    empty($_POST['csrf_token']) ||
+    empty($_SESSION['csrf_token']) ||
+    !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])
+) {
+    http_response_code(403);
+    die("Invalid CSRF token.");
 }
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Login</title>
-</head>
-<body>
-    <?php if ($error): ?>
-        <p style="color:red;"><?= htmlspecialchars($error) ?></p>
-    <?php endif; ?>
 
-    <form method="POST" action="">
-        <label>Username <input type="text"     name="username" required autocomplete="username"></label><br>
-        <label>Password <input type="password" name="password" required autocomplete="current-password"></label><br>
-        <button type="submit">Log in</button>
-    </form>
-</body>
-</html>
+$username = trim($_POST["username"] ?? "");
+$password = $_POST["password"] ?? "";
+
+if ($username === "" || $password === "") {
+    header("Location: login.html?error=invalid");
+    exit();
+}
+
+try {
+    $db  = getAuthDatabase();
+    $ip  = getIPAddress();
+    $rateKey = "login:" . $ip;
+
+    // ── Layer 1: IP-based rate limit (5 attempts per 15 min per IP) ───────────
+    if (!checkRateLimit($db, $rateKey, 5, 900)) {
+        header("Location: login.html?error=rate_limit");
+        exit();
+    }
+
+    // Fetch user record
+    $stmt = $db->prepare(
+        "SELECT id, username, password_hash FROM users WHERE username = :username"
+    );
+    $stmt->execute([':username' => $username]);
+    $user = $stmt->fetch();
+
+    // ── Layer 2: Per-account lockout (5 failed attempts → 15 min lock) ───────
+    // Check BEFORE password_verify so locked accounts get no timing hint.
+    if ($user && isAccountLocked($db, $user['id'])) {
+        $remaining = max(0, getAccountLockExpiry($db, $user['id']) - time());
+        $minutes   = (int) ceil($remaining / 60);
+        header("Location: login.html?error=locked&minutes=" . $minutes);
+        exit();
+    }
+
+    // ── Verify password ───────────────────────────────────────────────────────
+    if ($user && password_verify($password, $user['password_hash'])) {
+        // Success — clear all lockout state and regenerate session
+        clearAccountLock($db, $user['id']);
+        resetAttempts($db, $rateKey);
+        session_regenerate_id(true);
+        $_SESSION["user_id"]  = $user["id"];
+        $_SESSION["username"] = $user["username"];
+        header("Location: welcome.php");
+        exit();
+    }
+
+    // ── Record failure ────────────────────────────────────────────────────────
+    incrementAttempts($db, $rateKey);              // IP counter
+    if ($user) {
+        incrementAccountAttempts($db, $user['id']); // Account counter
+    }
+
+} catch (PDOException $e) {
+    header("Location: login.html?error=db");
+    exit();
+}
+
+header("Location: login.html?error=invalid");
+exit();

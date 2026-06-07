@@ -100,6 +100,22 @@
             margin-top: 0.5rem;
             display: none;
         }
+
+        .password-strength-bar {
+            height: 4px;
+            border-radius: 4px;
+            margin-top: 6px;
+            background: #e0e0e0;
+            transition: background 0.3s;
+        }
+        .strength-label {
+            font-size: 0.78rem;
+            margin-top: 3px;
+            font-weight: 500;
+        }
+        .strength-weak   { background: #e74c3c; }
+        .strength-medium { background: #f39c12; }
+        .strength-strong { background: #2ecc71; }
     </style>
 </head>
 <body>
@@ -168,9 +184,11 @@
                 <input type="email" id="email" name="email" required>
             </div>
 
-            <div class="form-group">                    
+            <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password" aria-describedby="password-strength-label">
+                <div class="password-strength-bar" id="strength-bar"></div>
+                <p class="strength-label" id="password-strength-label" aria-live="polite"></p>
                 <p class="error-message" id="signup-error"></p>
             </div>
 
@@ -190,6 +208,39 @@
 
     <script src="otherJS/hamberger.js"></script>
     <script>
+        // ── Password Strength Meter ────────────────────────────────────────────
+        const passwordInput = document.getElementById('password');
+        const strengthBar   = document.getElementById('strength-bar');
+        const strengthLabel = document.getElementById('password-strength-label');
+
+        passwordInput.addEventListener('input', function () {
+            const val = this.value;
+            let score = 0;
+            if (val.length >= 8)  score++;
+            if (val.length >= 12) score++;
+            if (/[A-Z]/.test(val)) score++;
+            if (/[0-9]/.test(val)) score++;
+            if (/[^A-Za-z0-9]/.test(val)) score++;
+
+            strengthBar.className = 'password-strength-bar';
+            if (val.length === 0) {
+                strengthLabel.textContent = '';
+            } else if (score <= 2) {
+                strengthBar.classList.add('strength-weak');
+                strengthLabel.textContent = '🔴 Weak — use 8+ chars, numbers & symbols';
+                strengthLabel.style.color = '#e74c3c';
+            } else if (score <= 3) {
+                strengthBar.classList.add('strength-medium');
+                strengthLabel.textContent = '🟡 Medium — add uppercase or symbols';
+                strengthLabel.style.color = '#f39c12';
+            } else {
+                strengthBar.classList.add('strength-strong');
+                strengthLabel.textContent = '🟢 Strong password!';
+                strengthLabel.style.color = '#2ecc71';
+            }
+        });
+        // ─────────────────────────────────────────────────────────────────────
+
         // Show error or success messages from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const errorMsg = document.getElementById('signup-error');
@@ -198,6 +249,12 @@
             errorMsg.style.display = 'block';
             if (err === 'exists') {
                 errorMsg.textContent = 'Username already exists.';
+            } else if (err === 'email_exists') {
+                errorMsg.textContent = 'Email address already registered.';
+            } else if (err === 'rate_limit') {
+                errorMsg.textContent = 'Too many attempts. Please try again in an hour.';
+            } else if (err === 'weak_password') {
+                errorMsg.textContent = 'Password must be at least 8 characters.';
             } else if (err === 'db') {
                 errorMsg.textContent = 'Database error. Please try again.';
             } else {
@@ -221,5 +278,6 @@
             .catch(error => console.error('Error fetching CSRF token:', error));
     </script>
     <script src="https://kit.fontawesome.com/1b2b6a64da.js" crossorigin="anonymous"></script>
+    <script src="otherJS/accessibility.js"></script>
 </body>
 </html>
