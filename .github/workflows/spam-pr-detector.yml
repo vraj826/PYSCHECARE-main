@@ -32,9 +32,14 @@ jobs:
             //    • Changes fewer than 3 lines of code AND
             //      the PR carries (or claims) the "level:advanced" label.
             //
-            //  CONDITION B — README-only with no docs tag
-            //    • ONLY modifies README.md (and nothing else) AND
-            //      the PR does NOT carry the "type:docs" label.
+            //  CONDITION B — Docs-only files without type:docs label
+            //    • ALL modified files are documentation files
+            //      (readme.md, contributing.md, changelog.md — anywhere
+            //      in the repo, matched by path suffix, case-insensitive)
+            //      AND the PR does NOT carry the "type:docs" label.
+            //
+            //  CONDITION C — Empty or missing PR description
+            //    • PR body is empty or shorter than 20 characters.
             //
             //  CONDITION C — Empty or missing PR description
             //    • PR body is empty or shorter than 20 characters.
@@ -98,6 +103,8 @@ jobs:
               owner, repo, pull_number: prNum, per_page: 100
             });
 
+            // Lowercase all filenames so matching is always case-insensitive,
+            // handling README.md, Readme.md, readme.md identically
             const filenames    = files.map(f => f.filename.toLowerCase());
             const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
 
@@ -124,17 +131,22 @@ jobs:
             // CONDITION A: fewer than 3 lines changed AND labelled/claiming level:advanced
             const condA = totalChanges < 3 && (hasAdvanced || claimsAdvanced);
 
-            // CONDITION B: ONLY README.md modified AND no type:docs label
-            const onlyReadme = filenames.length > 0 &&
-                               filenames.every(f => f === 'readme.md');
-            const condB = onlyReadme && !hasDocs;
+            // CONDITION B: ALL files are docs-only (matched by path suffix)
+            // Covers files in any subdirectory, e.g. docs/README.md, CONTRIBUTING.md
+            // Previously only checked `f === 'readme.md'` which missed:
+            //   - Files in subdirectories (docs/readme.md)
+            //   - Other doc files (contributing.md, changelog.md)
+            const DOC_SUFFIXES = ['readme.md', 'contributing.md', 'changelog.md'];
+            const isDocFile    = f => DOC_SUFFIXES.some(suffix => f.endsWith(suffix));
+            const onlyDocFiles = filenames.length > 0 && filenames.every(isDocFile);
+            const condB        = onlyDocFiles && !hasDocs;
 
             // CONDITION C: empty or very short PR description (< 20 characters)
             const prBody = (context.payload.pull_request.body || '').trim();
             const condC  = prBody.length < 20;
 
             console.log(`Condition A (tiny+advanced)        : ${condA}`);
-            console.log(`Condition B (readme-only, no docs) : ${condB}`);
+            console.log(`Condition B (docs-only, no label)  : ${condB} — files: ${filenames.join(', ')}`);
             console.log(`Condition C (empty description)    : ${condC} — body length: ${prBody.length}`);
 
             // ── 5. PR passes all checks ───────────────────────────────────
@@ -181,8 +193,15 @@ jobs:
               );
             if (condB)
               reasons.push(
-                `- **README-only change without \`type:docs\` label**: PRs that only modify \`README.md\` ` +
-                `must carry the \`type:docs\` label so maintainers can triage them correctly.`
+                `- **Documentation-only change without \`type:docs\` label**: This PR only modifies ` +
+                `documentation files (\`README.md\`, \`CONTRIBUTING.md\`, \`CHANGELOG.md\`). ` +
+                `Please add the \`type:docs\` label so maintainers can triage it correctly.`
+              );
+            if (condC)
+              reasons.push(
+                `- **Missing or empty PR description**: Your PR description is too short ` +
+                `(**${prBody.length} character(s)**). Please describe what changes you made and why. ` +
+                `A good description helps maintainers understand and review your work faster.`
               );
             if (condC)
               reasons.push(
