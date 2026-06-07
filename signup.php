@@ -40,15 +40,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Connect to local SQLite database
     try {
         $db = getAuthDatabase();
+        $ip = getIPAddress();
+        $rateKey = "signup:" . $ip;
+
+        // Check rate limit: 3 attempts per hour
+        if (!checkRateLimit($db, $rateKey, 3, 3600)) {
+            header("Location: signup.html?error=rate_limit");
+            exit();
+        }
 
         // Check if username already exists
         $stmt = $db->prepare("SELECT id FROM users WHERE username = :username");
         $stmt->execute([':username' => $username]);
         if ($stmt->fetch()) {
+            incrementAttempts($db, $rateKey);
             header("Location: signup.html?error=exists");
             exit();
         }
 
+        // Check if email already exists
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = :email");
+        $stmt->execute([':email' => $email]);
+        if ($stmt->fetch()) {
+            incrementAttempts($db, $rateKey);
+            header("Location: signup.html?error=email_exists");
+            exit();
+        }
         // Hash password securely with explicit cost to match login script
         $password_hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 
@@ -61,6 +78,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             ':email' => $email,
             ':password_hash' => $password_hash
         ]);
+
+        // Reset rate limit on success
+        resetAttempts($db, $rateKey);
 
         // Automatically log in user after successful signup
         session_regenerate_id(true);

@@ -206,9 +206,15 @@
         // Show error message if login fails
         if (urlParams.has('error')) {
             const loginError = document.getElementById('login-error');
-            loginError.textContent = urlParams.get('error') === 'db'
-                ? 'Login is temporarily unavailable. Please try again.'
-                : 'Invalid username or password';
+            const err = urlParams.get('error');
+            
+            if (err === 'db') {
+                loginError.textContent = 'Login is temporarily unavailable. Please try again.';
+            } else if (err === 'rate_limit') {
+                loginError.textContent = 'Too many failed attempts. Please try again in 15 minutes.';
+            } else {
+                loginError.textContent = 'Invalid username or password';
+            }
             loginError.style.display = 'block';
         }
 

@@ -249,6 +249,10 @@
             errorMsg.style.display = 'block';
             if (err === 'exists') {
                 errorMsg.textContent = 'Username already exists.';
+            } else if (err === 'email_exists') {
+                errorMsg.textContent = 'Email address already registered.';
+            } else if (err === 'rate_limit') {
+                errorMsg.textContent = 'Too many attempts. Please try again in an hour.';
             } else if (err === 'weak_password') {
                 errorMsg.textContent = 'Password must be at least 8 characters.';
             } else if (err === 'db') {

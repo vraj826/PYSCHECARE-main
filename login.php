@@ -27,6 +27,14 @@ if ($username === "" || $password === "") {
 
 try {
     $db = getAuthDatabase();
+    $ip = getIPAddress();
+    $rateKey = "login:" . $ip;
+
+    // Check rate limit: 5 attempts per 15 minutes
+    if (!checkRateLimit($db, $rateKey, 5, 900)) {
+        header("Location: login.html?error=rate_limit");
+        exit();
+    }
 
     $stmt = $db->prepare(
         "SELECT id, username, password_hash FROM users WHERE username = :username"
@@ -35,12 +43,16 @@ try {
     $user = $stmt->fetch();
 
     if ($user && password_verify($password, $user['password_hash'])) {
+        resetAttempts($db, $rateKey);
         session_regenerate_id(true);
         $_SESSION["user_id"] = $user["id"];
         $_SESSION["username"] = $user["username"];
         header("Location: welcome.php");
         exit();
     }
+
+    // Record failed attempt
+    incrementAttempts($db, $rateKey);
 } catch (PDOException $e) {
     header("Location: login.html?error=db");
     exit();

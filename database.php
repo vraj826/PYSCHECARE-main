@@ -10,7 +10,7 @@ function getAuthDatabase(): PDO
         "CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            email TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL
         )"
     );
@@ -25,5 +25,65 @@ function getAuthDatabase(): PDO
         )"
     );
 
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS rate_limiting (
+            rate_key TEXT PRIMARY KEY,
+            attempts INTEGER DEFAULT 0,
+            last_attempt INTEGER DEFAULT 0
+        )"
+    );
+
     return $db;
+}
+
+function getIPAddress(): string
+{
+    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+        return $_SERVER['HTTP_CLIENT_IP'];
+    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        // X-Forwarded-For can contain multiple IPs, the first one is the client
+        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        return trim($ips[0]);
+    } else {
+        return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    }
+}
+
+function checkRateLimit(PDO $db, string $key, int $maxAttempts, int $windowSeconds): bool
+{
+    $stmt = $db->prepare("SELECT attempts, last_attempt FROM rate_limiting WHERE rate_key = :key");
+    $stmt->execute([':key' => $key]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        return true;
+    }
+
+    $now = time();
+    if ($now - $row['last_attempt'] > $windowSeconds) {
+        // Window expired, reset automatically
+        resetAttempts($db, $key);
+        return true;
+    }
+
+    return $row['attempts'] < $maxAttempts;
+}
+
+function incrementAttempts(PDO $db, string $key): void
+{
+    $now = time();
+    $stmt = $db->prepare("
+        INSERT INTO rate_limiting (rate_key, attempts, last_attempt) 
+        VALUES (:key, 1, :now)
+        ON CONFLICT(rate_key) DO UPDATE SET 
+            attempts = attempts + 1,
+            last_attempt = :now
+    ");
+    $stmt->execute([':key' => $key, ':now' => $now]);
+}
+
+function resetAttempts(PDO $db, string $key): void
+{
+    $stmt = $db->prepare("DELETE FROM rate_limiting WHERE rate_key = :key");
+    $stmt->execute([':key' => $key]);
 }
