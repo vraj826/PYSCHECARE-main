@@ -59,6 +59,33 @@
             margin-right: 0;
         }
 
+        .crisis-warning {
+            display: none;
+            margin: 12px;
+            padding: 12px;
+            border-left: 4px solid #d63031;
+            border-radius: 6px;
+            background: #fff2f2;
+            color: #3d1f1f;
+            font-size: 0.95rem;
+        }
+
+        .crisis-warning strong {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .crisis-warning a {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 8px 12px;
+            border-radius: 5px;
+            background: #d63031;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
         @keyframes wave {
             0%, 60%, 100% {
                 transform: translateY(0);
@@ -184,7 +211,17 @@
                         <button class="mode-btn" id="btnVoiceMode" type="button" title="Voice Assistant Mode">
                             <i class="fas fa-microphone"></i> Voice
                         </button>
+                        <button class="mode-btn" id="btnNewChat" type="button" title="Start New Conversation">
+                            <i class="fas fa-plus"></i> New Chat
+                        </button>
                     </div>
+                </div>
+
+                <div class="crisis-warning" id="crisisWarning" role="alert">
+                    <strong>Immediate support may be needed.</strong>
+                    <div>Are you safe right now?</div>
+                    <div>If you may hurt yourself or someone else, call emergency services now. In the U.S. call or text 988 for crisis support.</div>
+                    <a href="sos.html">SOS resources</a>
                 </div>
 
                 <main class="msger-chat">
@@ -452,6 +489,7 @@
         function setupModeToggle() {
             const btnTextMode = document.getElementById('btnTextMode');
             const btnVoiceMode = document.getElementById('btnVoiceMode');
+            const btnNewChat = document.getElementById('btnNewChat');
             const fallbackBanner = document.getElementById('fallbackBanner');
             const voiceIndicator = document.getElementById('voiceIndicator');
             const micBtn = document.getElementById('micBtn');
@@ -521,6 +559,27 @@
                     }
                 });
             }
+            if (btnNewChat) {
+                btnNewChat.addEventListener('click', () => {
+                    if (!confirm('Start a new conversation? This will clear the current chat session.')) {
+                        return;
+                    }
+                    localStorage.removeItem('psyche_session_id');
+                    console.log('Chat session reset successfully.');
+                    
+                    const msgerChat = document.querySelector(".msger-chat");
+                    if (msgerChat) {
+                        msgerChat.innerHTML = '';
+                        
+                        appendMessage(
+                             "PsycheCare Assistant",
+                             BOT_IMG,
+                             "left",
+                             "Hello! I'm your mental health assistant. Feel free to share your thoughts or ask me questions about mental health. I'm here to listen and support you."
+                            );
+                        }
+                    });
+                }
 
             if (micBtn) {
                 micBtn.addEventListener('click', () => {
@@ -664,6 +723,14 @@
             }
         }
 
+        function updateCrisisWarning(risk) {
+            const warning = document.getElementById('crisisWarning');
+            if (!warning) return;
+
+            const level = risk && risk.level;
+            warning.style.display = (level === 'HIGH' || level === 'CRITICAL') ? 'block' : 'none';
+        }
+
         function enableInputs() {
             const msgerInput = document.querySelector(".msger-input");
             const msgerSendBtn = document.querySelector(".msger-send-btn");
@@ -687,7 +754,7 @@
                     // Send stored session_id so bot remembers conversation context
                     body: JSON.stringify({
                         message: userText,
-                        session_id: sessionStorage.getItem('psyche_session_id') || undefined
+                        session_id: localStorage.getItem('psyche_session_id') || undefined
                     })
                 });
                 
@@ -697,9 +764,9 @@
                 
                 const data = await response.json();
 
-                // Persist the session_id for the lifetime of the browser tab
+                // Persist the session_id across browser refreshes and restarts
                 if (data.session_id) {
-                    sessionStorage.setItem('psyche_session_id', data.session_id);
+                    localStorage.setItem('psyche_session_id', data.session_id);
                 }
                 
                 // Remove typing indicator
@@ -707,6 +774,7 @@
                 
                 // Add the bot's response to the chat
                 appendMessage("Arya Assistant", BOT_IMG, "left", data.response);
+                updateCrisisWarning(data.risk);
                 enableInputs();
                 
             } catch (error) {

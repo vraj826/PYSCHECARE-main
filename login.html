@@ -103,6 +103,20 @@
             display: none;
         }
 
+        .locked-banner {
+            display: none;
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            color: #fff;
+            padding: 1rem 1.25rem;
+            border-radius: 10px;
+            margin-bottom: 1.25rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .locked-banner strong { font-size: 1.05rem; }
+
         .logout-toast {
             display: none;
             background: #2ecc71;
@@ -164,6 +178,11 @@
     <!-- Login Form -->
     <div class="login-container">
         <div id="logout-toast" class="logout-toast">✅ You have been successfully logged out.</div>
+        <div id="locked-banner" class="locked-banner">
+            🔒 <strong>Account temporarily locked</strong><br>
+            Too many failed login attempts.<br>
+            <span id="locked-msg">Please try again in 15 minutes.</span>
+        </div>
         <div class="login-header">
             <div class="login-illustration">
                 <img src="Images/illustration-new/home-bot-img.png" alt="Login">
@@ -207,15 +226,27 @@
         if (urlParams.has('error')) {
             const loginError = document.getElementById('login-error');
             const err = urlParams.get('error');
-            
-            if (err === 'db') {
+
+            if (err === 'locked') {
+                // Show the prominent locked banner instead of the inline error
+                const banner = document.getElementById('locked-banner');
+                const minutes = parseInt(urlParams.get('minutes') || '15', 10);
+                document.getElementById('locked-msg').textContent =
+                    `Your account is locked. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`;
+                banner.style.display = 'block';
+                // Disable the form so users don't keep hammering
+                document.querySelector('.login-btn').disabled = true;
+                document.querySelector('.login-btn').style.opacity = '0.5';
+            } else if (err === 'db') {
                 loginError.textContent = 'Login is temporarily unavailable. Please try again.';
+                loginError.style.display = 'block';
             } else if (err === 'rate_limit') {
-                loginError.textContent = 'Too many failed attempts. Please try again in 15 minutes.';
+                loginError.textContent = 'Too many failed attempts from your network. Please try again in 15 minutes.';
+                loginError.style.display = 'block';
             } else {
                 loginError.textContent = 'Invalid username or password';
+                loginError.style.display = 'block';
             }
-            loginError.style.display = 'block';
         }
 
         // Show logout success toast
