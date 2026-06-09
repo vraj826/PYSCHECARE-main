@@ -1,12 +1,12 @@
 import hmac
 import hashlib
 import os
-import uuid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from chatbot_integration import get_chatbot_response
+from crisis_detection import detect_crisis_risk, log_crisis_event
 
 app = Flask(__name__)
 # ── Global Payload Size Limit ────────────────────────────────────────────────
@@ -105,10 +105,11 @@ def chat():
     # Use session ID from request or generate a unique one
     user_id = data.get("session_id") or str(uuid.uuid4())
 
-    # Secure Context Mapping: user_id strictly derived from HMAC signature.
-    # We NO LONGER accept session_id from the client payload.
-    response = get_chatbot_response(message, user_id)
-    return jsonify({"response": response, "session_id": user_id})
+    risk = detect_crisis_risk(data["message"])
+    log_crisis_event(risk, user_id)
+
+    response = get_chatbot_response(data["message"], user_id)
+    return jsonify({"response": response, "session_id": user_id, "risk": risk})
 
 
 if __name__ == "__main__":
