@@ -1,7 +1,6 @@
 import hmac
 import hashlib
 import os
-import uuid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -102,11 +101,7 @@ def chat():
             "error": "Message too long. Maximum length is 500 characters."
         }), 400
 
-    # Use session ID from request or generate a unique one
-    user_id = data.get("session_id") or str(uuid.uuid4())
-
-    # Secure Context Mapping: user_id strictly derived from HMAC signature.
-    # We NO LONGER accept session_id from the client payload.
+    # user_id is already verified from HMAC token — reject any client-supplied session_id
     response = get_chatbot_response(message, user_id)
     return jsonify({"response": response, "session_id": user_id})
 
