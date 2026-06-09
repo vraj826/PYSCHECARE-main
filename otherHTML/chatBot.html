@@ -59,6 +59,33 @@
             margin-right: 0;
         }
 
+        .crisis-warning {
+            display: none;
+            margin: 12px;
+            padding: 12px;
+            border-left: 4px solid #d63031;
+            border-radius: 6px;
+            background: #fff2f2;
+            color: #3d1f1f;
+            font-size: 0.95rem;
+        }
+
+        .crisis-warning strong {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .crisis-warning a {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 8px 12px;
+            border-radius: 5px;
+            background: #d63031;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
         @keyframes wave {
             0%, 60%, 100% {
                 transform: translateY(0);
@@ -185,6 +212,13 @@
                             <i class="fas fa-microphone"></i> Voice
                         </button>
                     </div>
+                </div>
+
+                <div class="crisis-warning" id="crisisWarning" role="alert">
+                    <strong>Immediate support may be needed.</strong>
+                    <div>Are you safe right now?</div>
+                    <div>If you may hurt yourself or someone else, call emergency services now. In the U.S. call or text 988 for crisis support.</div>
+                    <a href="sos.html">SOS resources</a>
                 </div>
 
                 <main class="msger-chat">
@@ -664,6 +698,14 @@
             }
         }
 
+        function updateCrisisWarning(risk) {
+            const warning = document.getElementById('crisisWarning');
+            if (!warning) return;
+
+            const level = risk && risk.level;
+            warning.style.display = (level === 'HIGH' || level === 'CRITICAL') ? 'block' : 'none';
+        }
+
         function enableInputs() {
             const msgerInput = document.querySelector(".msger-input");
             const msgerSendBtn = document.querySelector(".msger-send-btn");
@@ -707,6 +749,7 @@
                 
                 // Add the bot's response to the chat
                 appendMessage("Arya Assistant", BOT_IMG, "left", data.response);
+                updateCrisisWarning(data.risk);
                 enableInputs();
                 
             } catch (error) {

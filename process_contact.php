@@ -14,33 +14,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Invalid CSRF token.");
     }
 
-    $name    = htmlspecialchars(trim($_POST['name'] ?? ''));
-    $email   = htmlspecialchars(trim($_POST['email'] ?? ''));
+    header('Content-Type: application/json');
+
+    $name    = htmlspecialchars(trim($_POST['name']    ?? ''));
+    $email   = htmlspecialchars(trim($_POST['email']   ?? ''));
+    $subject = htmlspecialchars(trim($_POST['subject'] ?? ''));
     $message = htmlspecialchars(trim($_POST['message'] ?? ''));
 
-    if (!$name || !$email || !$message) {
-        die("All fields are required.");
+    // Validate all four fields are present
+    if (!$name || !$email || !$subject || !$message) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'All fields are required.']);
+        exit;
     }
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        die("Invalid email address.");
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid email address.']);
+        exit;
     }
 
     try {
         require_once __DIR__ . '/database.php';
         $db = getAuthDatabase();
 
-        $stmt = $db->prepare("INSERT INTO contact_messages (name, email, message) VALUES (:name, :email, :message)");
+        $stmt = $db->prepare(
+            "INSERT INTO contact_messages (name, email, subject, message) VALUES (:name, :email, :subject, :message)"
+        );
         $stmt->execute([
-            ':name' => $name,
-            ':email' => $email,
-            ':message' => $message
+            ':name'    => $name,
+            ':email'   => $email,
+            ':subject' => $subject,
+            ':message' => $message,
         ]);
 
-        echo "Message received. Thank you, $name!";
+        echo json_encode(['success' => true, 'message' => "Message received. Thank you, $name!"]);
     } catch (PDOException $e) {
         http_response_code(500);
-        die("Database error. Please try again later.");
+        echo json_encode(['success' => false, 'error' => 'Database error. Please try again later.']);
     }
 }
 ?>
