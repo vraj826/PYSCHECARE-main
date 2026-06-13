@@ -1,44 +1,45 @@
 // Dark Mode Toggle Script
-// Theme is pre-applied by bootstrap script in <head> to prevent flash
-// This script only handles toggle and updates storage + button state
-(() => {
-    const body = document.body;
-   const saved = localStorage.getItem('darkMode');
-    const isDarkMode = saved === 'enabled' ||
-       (saved === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-+    if(body && isDarkMode) body.classList.add('dark-mode');
-+
-+    document.addEventListener('DOMContentLoaded', function() {
+// ── Early apply (runs before first paint) ───────────────────────────────────
+(() => {
+    const saved = localStorage.getItem('darkMode');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (saved === 'enabled' || (saved === null && prefersDark)) {
+        document.documentElement.classList.add('dark-mode');
+    }
+})();
+
+// ── Interactive toggle (wired after DOM is ready) ───────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
     const darkModeToggle = document.getElementById('darkModeToggle');
-   const body = document.body;
-    
-    // Toggle dark mode on button click
+    const body = document.body;
+
+    const isDarkMode = body.classList.contains('dark-mode') ||
+                       document.documentElement.classList.contains('dark-mode');
+
+    // Sync toggle icon to current state
+    if (isDarkMode) {
+        body.classList.add('dark-mode');
+        if (darkModeToggle) {
+            darkModeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            darkModeToggle.setAttribute('title', 'Toggle Light Mode');
+        }
+    }
+
     if (darkModeToggle) {
-        darkModeToggle.addEventListener('click', function() {
+        darkModeToggle.addEventListener('click', function () {
             body.classList.toggle('dark-mode');
-            
-            // Update localStorage and button state
+
             if (body.classList.contains('dark-mode')) {
                 localStorage.setItem('darkMode', 'enabled');
                 darkModeToggle.innerHTML = '<i class="fas fa-sun"></i>';
                 darkModeToggle.setAttribute('title', 'Toggle Light Mode');
-                darkModeToggle.setAttribute('aria-label', 'Toggle light mode');
             } else {
                 localStorage.setItem('darkMode', 'disabled');
                 darkModeToggle.innerHTML = '<i class="fas fa-moon"></i>';
                 darkModeToggle.setAttribute('title', 'Toggle Dark Mode');
-                darkModeToggle.setAttribute('aria-label', 'Toggle dark mode');
             }
         });
-        
-        // Sync button icon with current theme state
-        if (body.classList.contains('dark-mode')) {
-            darkModeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-            darkModeToggle.setAttribute('title', 'Toggle Light Mode');
-            darkModeToggle.setAttribute('aria-label', 'Toggle light mode');
-        }
     }
- });
-})();
+});
 
