@@ -1,9 +1,17 @@
 // Dark Mode Toggle Script
 // Theme is pre-applied by bootstrap script in <head> to prevent flash
 // This script only handles toggle and updates storage + button state
-document.addEventListener('DOMContentLoaded', function() {
-    const darkModeToggle = document.getElementById('darkModeToggle');
+(() => {
     const body = document.body;
+   const saved = localStorage.getItem('darkMode');
+    const isDarkMode = saved === 'enabled' ||
+       (saved === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
++    if(body && isDarkMode) body.classList.add('dark-mode');
++
++    document.addEventListener('DOMContentLoaded', function() {
+    const darkModeToggle = document.getElementById('darkModeToggle');
+   const body = document.body;
     
     // Toggle dark mode on button click
     if (darkModeToggle) {
@@ -31,4 +39,6 @@ document.addEventListener('DOMContentLoaded', function() {
             darkModeToggle.setAttribute('aria-label', 'Toggle light mode');
         }
     }
-});
+ });
+})();
+
