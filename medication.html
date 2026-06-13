@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medications | PsycheCare</title>
+    <link rel="icon" href="Images/B_icon01.png">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .medication-page { width: min(1100px, 92%); margin: 2rem auto 4rem; color: var(--dark-color); }
+        .medication-head { margin: 2rem 0; }
+        .medication-head h1 { color: var(--primary-color); line-height: 1.2; }
+        .medication-layout { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 1.5rem; align-items: start; }
+        .medication-panel { background: rgba(255, 255, 255, 0.78); border-radius: 8px; padding: 1.2rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); }
+        .medication-panel h2 { font-size: 1.15rem; margin-bottom: 1rem; color: var(--primary-color); }
+        .medication-form label { display: block; font-weight: 600; margin: .7rem 0 .25rem; }
+        .medication-form input, .medication-form textarea { width: 100%; padding: .7rem; border: 1px solid #ddd; border-radius: 6px; font: inherit; }
+        .medication-form textarea { min-height: 84px; resize: vertical; }
+        .medication-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; }
+        .medication-btn { border: 0; border-radius: 6px; padding: .65rem .9rem; background: var(--primary-color); color: #fff; cursor: pointer; font-weight: 600; }
+        .medication-btn.secondary { background: #596275; }
+        .medication-btn.danger { background: #c44569; }
+        .medication-error { color: #b00020; min-height: 1.4rem; margin-top: .7rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+        .stat-box { background: #f5f2ff; border-radius: 8px; padding: .8rem; }
+        .stat-box strong { display: block; font-size: 1.4rem; color: var(--primary-color); }
+        .due-message { margin: .5rem 0 1rem; font-weight: 600; color: #4b3ca7; }
+        .medication-list, .adherence-list { display: grid; gap: .8rem; }
+        .medication-item, .log-item { border: 1px solid #e4e1ef; border-radius: 8px; padding: .9rem; background: #fff; }
+        .medication-item h3 { margin-bottom: .35rem; }
+        .muted { color: #666; font-size: .92rem; }
+        body.dark-mode .medication-panel, body.dark-mode .medication-item, body.dark-mode .log-item { background: #242424; }
+        body.dark-mode .stat-box { background: #30284d; }
+        @media (max-width: 800px) {
+            .medication-layout, .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo-cantainer"><h2 class="logo">PsycheCare.</h2></div>
+        <div class="nav-and-btn-cont">
+            <nav class="nav-list-cont" aria-label="Main navigation">
+                <ul class="nav-ul">
+                    <li><a href="index.html">HOME</a></li>
+                    <li><a href="otherHTML/chatBot.php">CHAT BOT</a></li>
+                    <li><a href="otherHTML/statistics.html">STATISTICS</a></li>
+                    <li><a href="medication.html" class="active">MEDICATIONS</a></li>
+                    <li><a href="contact.html">CONTACT</a></li>
+                    <li><a href="login.html">LOGIN</a></li>
+                </ul>
+            </nav>
+            <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle Dark Mode" aria-label="Toggle dark mode">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+    </div>
+
+    <main class="medication-page">
+        <section class="medication-head">
+            <h1>Medication Management</h1>
+            <p class="muted">Track medications and simple taken/skipped adherence logs.</p>
+        </section>
+
+        <section class="medication-layout">
+            <form class="medication-panel medication-form" id="medicationForm">
+                <h2 id="formTitle">Add Medication</h2>
+                <input type="hidden" id="medicationId">
+                <label for="name">Medication name</label>
+                <input id="name" maxlength="120" required>
+                <label for="dosage">Dosage</label>
+                <input id="dosage" maxlength="120" required>
+                <label for="frequency">Frequency</label>
+                <input id="frequency" maxlength="120" placeholder="Daily">
+                <label for="startDate">Start date</label>
+                <input id="startDate" type="date" required>
+                <label for="notes">Notes</label>
+                <textarea id="notes" maxlength="500"></textarea>
+                <div class="medication-actions">
+                    <button class="medication-btn" type="submit">Save</button>
+                    <button class="medication-btn secondary" type="button" id="cancelEdit">Cancel</button>
+                </div>
+                <p class="medication-error" id="formError" role="alert"></p>
+            </form>
+
+            <div>
+                <section class="medication-panel">
+                    <h2>Adherence Statistics</h2>
+                    <div class="stats-grid" id="statsGrid"></div>
+                    <p class="due-message" id="dueToday"></p>
+                </section>
+
+                <section class="medication-panel">
+                    <h2>Medication List</h2>
+                    <div class="medication-list" id="medicationList"></div>
+                </section>
+
+                <section class="medication-panel">
+                    <h2>Adherence Log</h2>
+                    <div class="adherence-list" id="adherenceLog"></div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <script src="otherJS/darkMode.js"></script>
+    <script>
+        const apiBase = window.PSYCHECARE_API_BASE || 'http://localhost:5000';
+        const originHeaders = { 'Content-Type': 'application/json' };
+        const form = document.getElementById('medicationForm');
+        const errorBox = document.getElementById('formError');
+        let medications = [];
+
+        async function request(path, options = {}) {
+            const response = await fetch(apiBase + path, {
+                ...options,
+                headers: { ...originHeaders, ...(options.headers || {}) },
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Request failed.');
+            return data;
+        }
+
+        function payloadFromForm() {
+            return {
+                name: document.getElementById('name').value,
+                dosage: document.getElementById('dosage').value,
+                frequency: document.getElementById('frequency').value,
+                start_date: document.getElementById('startDate').value,
+                notes: document.getElementById('notes').value,
+            };
+        }
+
+        function editMedication(id) {
+            const medication = medications.find(item => item.id === id);
+            if (!medication) return;
+            document.getElementById('formTitle').textContent = 'Edit Medication';
+            document.getElementById('medicationId').value = medication.id;
+            document.getElementById('name').value = medication.name;
+            document.getElementById('dosage').value = medication.dosage;
+            document.getElementById('frequency').value = medication.frequency;
+            document.getElementById('startDate').value = medication.start_date;
+            document.getElementById('notes').value = medication.notes || '';
+        }
+
+        function resetForm() {
+            form.reset();
+            document.getElementById('formTitle').textContent = 'Add Medication';
+            document.getElementById('medicationId').value = '';
+            errorBox.textContent = '';
+        }
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            }[char]));
+        }
+
+        async function deleteMedication(id) {
+            await request('/medications/' + id, { method: 'DELETE' });
+            await loadMedications();
+        }
+
+        async function logAdherence(id, status) {
+            await request('/medications/' + id + '/adherence', {
+                method: 'POST',
+                body: JSON.stringify({ status }),
+            });
+            await loadMedications();
+        }
+
+        function render(data) {
+            medications = data.medications;
+            document.getElementById('statsGrid').innerHTML = `
+                <div class="stat-box"><strong>${data.stats.total_doses_logged}</strong>Total logged</div>
+                <div class="stat-box"><strong>${data.stats.taken_count}</strong>Taken</div>
+                <div class="stat-box"><strong>${data.stats.skipped_count}</strong>Skipped</div>
+                <div class="stat-box"><strong>${data.stats.adherence_percentage}%</strong>Adherence</div>
+            `;
+            document.getElementById('dueToday').textContent = data.due_today.length
+                ? 'Medication due today: ' + data.due_today.map(item => item.name).join(', ')
+                : 'No medication due today.';
+
+            document.getElementById('medicationList').innerHTML = medications.length ? medications.map(item => `
+                <article class="medication-item">
+                    <h3>${escapeHtml(item.name)}</h3>
+                    <p>${escapeHtml(item.dosage)} - ${escapeHtml(item.frequency)}</p>
+                    <p class="muted">Starts ${escapeHtml(item.start_date)}${item.notes ? ' - ' + escapeHtml(item.notes) : ''}</p>
+                    <div class="medication-actions">
+                        <button class="medication-btn" onclick="logAdherence('${item.id}', 'taken')">Taken</button>
+                        <button class="medication-btn secondary" onclick="logAdherence('${item.id}', 'skipped')">Skipped</button>
+                        <button class="medication-btn secondary" onclick="editMedication('${item.id}')">Edit</button>
+                        <button class="medication-btn danger" onclick="deleteMedication('${item.id}')">Delete</button>
+                    </div>
+                </article>
+            `).join('') : '<p class="muted">No medications added yet.</p>';
+
+            document.getElementById('adherenceLog').innerHTML = data.logs.length ? data.logs.slice().reverse().map(log => `
+                <div class="log-item">${escapeHtml(log.date)}: ${escapeHtml(log.medication_name)} marked ${escapeHtml(log.status)}</div>
+            `).join('') : '<p class="muted">No adherence logs yet.</p>';
+        }
+
+        async function loadMedications() {
+            try {
+                render(await request('/medications'));
+            } catch (error) {
+                errorBox.textContent = error.message;
+            }
+        }
+
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            const id = document.getElementById('medicationId').value;
+            try {
+                await request(id ? '/medications/' + id : '/medications', {
+                    method: id ? 'PUT' : 'POST',
+                    body: JSON.stringify(payloadFromForm()),
+                });
+                resetForm();
+                await loadMedications();
+            } catch (error) {
+                errorBox.textContent = error.message;
+            }
+        });
+
+        document.getElementById('cancelEdit').addEventListener('click', resetForm);
+        loadMedications();
+    </script>
+</body>
+</html>

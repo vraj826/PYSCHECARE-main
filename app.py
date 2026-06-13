@@ -10,9 +10,11 @@ from flask_limiter.util import get_remote_address
 from chatbot_integration import get_chatbot_response
 from validation import validate_chat_payload
 from crisis_detection import detect_crisis_risk, log_crisis_event
+from medication_manager import MedicationManager, MedicationValidationError
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024
+medication_manager = MedicationManager()
 
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN")
 if not ALLOWED_ORIGIN:
@@ -81,6 +83,61 @@ def chat():
 
     response = get_chatbot_response(data["message"], user_id)
     return jsonify({"response": response, "session_id": user_id, "risk": risk})
+
+
+@app.route("/medications", methods=["GET"])
+def medications_index():
+    return jsonify({
+        "medications": medication_manager.list_medications(),
+        "logs": medication_manager.list_logs(),
+        "stats": medication_manager.adherence_stats(),
+        "due_today": medication_manager.due_today(),
+    })
+
+
+@app.route("/medications", methods=["POST"])
+def medications_create():
+    data = request.get_json(silent=True) or {}
+    try:
+        medication = medication_manager.create_medication(data)
+    except MedicationValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"medication": medication}), 201
+
+
+@app.route("/medications/<medication_id>", methods=["PUT"])
+def medications_update(medication_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        medication = medication_manager.update_medication(medication_id, data)
+    except MedicationValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not medication:
+        return jsonify({"error": "Medication not found."}), 404
+    return jsonify({"medication": medication})
+
+
+@app.route("/medications/<medication_id>", methods=["DELETE"])
+def medications_delete(medication_id):
+    if not medication_manager.delete_medication(medication_id):
+        return jsonify({"error": "Medication not found."}), 404
+    return jsonify({"deleted": True})
+
+
+@app.route("/medications/<medication_id>/adherence", methods=["POST"])
+def medications_adherence(medication_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        log_entry = medication_manager.log_adherence(
+            medication_id,
+            data.get("status"),
+            data.get("date"),
+        )
+    except MedicationValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not log_entry:
+        return jsonify({"error": "Medication not found."}), 404
+    return jsonify({"log": log_entry}), 201
 
 
 @app.errorhandler(413)
