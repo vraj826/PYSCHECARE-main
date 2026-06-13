@@ -11,6 +11,18 @@
     <link rel="icon" href="../Images/B_icon01.png">
     <link rel="stylesheet" href="../otherStylesheet/common.css">
     <link rel="stylesheet" href="../otherStylesheet/statistics.css">
+
+    <!-- Dark mode bootstrap: Apply theme before first paint to prevent flash -->
+    <script>
+        (function() {
+            const isDarkMode = localStorage.getItem('darkMode') === 'enabled' || 
+                               (localStorage.getItem('darkMode') === null && 
+                                window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (isDarkMode) {
+                document.body.classList.add('dark-mode');
+            }
+        })();
+    </script>
 </head>
 <body>
     <!-- Floating circles for consistent design across all pages -->

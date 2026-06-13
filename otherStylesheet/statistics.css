@@ -330,7 +330,7 @@
 
 /* Dark Mode Styles */
 body.dark-mode .statistics-head h1 {
-    color: var(--dark-color);
+     color: var(--light-color);
 }
 
 body.dark-mode .statistics-head p {
@@ -343,7 +343,7 @@ body.dark-mode .statistics-table-head {
 
 body.dark-mode .statistics-table-head p,
 body.dark-mode .statistics-table-head span {
-    color: var(--dark-color);
+     color: var(--light-color);
 }
 
 body.dark-mode .statistics-table-row {

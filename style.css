@@ -1819,7 +1819,7 @@ body.dark-mode .nav-ul li a {
 body.dark-mode .nav-ul li a:hover,
 body.dark-mode .nav-ul li a:focus {
     background-color: var(--primary-color);
-    color: var(--light-color);
+     color: #ffffff;
 }
 
 body.dark-mode .dark-mode-toggle {
@@ -1840,7 +1840,7 @@ body.dark-mode .mobile-view-nav-list a {
 
 body.dark-mode .mobile-view-nav-list a:hover {
     background-color: var(--primary-color);
-    color: var(--light-color);
+    color: #ffffff;
 }
 
 body.dark-mode .footer {
